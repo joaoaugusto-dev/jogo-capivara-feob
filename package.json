@@ -1,0 +1,19 @@
+{
+  "name": "ovni-capivaras",
+  "version": "1.0.0",
+  "description": "Jogo 3D de feira: OVNI abduz capivaras. Host = console, celular = controle.",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "kiosk": "bash scripts/kiosk.sh"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

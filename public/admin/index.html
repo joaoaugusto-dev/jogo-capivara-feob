@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OVNI x CAPIVARAS - Admin</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#07070d;--blue:#1a22ff;--cy:#2ef2ff;--tx:#eef1ff;--mut:#8890b8;--card:rgba(255,255,255,.05);--ln:rgba(255,255,255,.12);--f:Impact,'Arial Black','DejaVu Sans',sans-serif;--b:system-ui,'Segoe UI',Roboto,sans-serif}
+body{margin:0;min-height:100vh;color:var(--tx);font-family:var(--b);background:radial-gradient(ellipse 70% 40% at 50% -10%,rgba(26,34,255,.4),transparent 70%),var(--bg)}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--ln)}
+.brand{font:22px var(--f);text-transform:lowercase}.brand b{color:var(--blue)}
+h1{margin:0;font:16px var(--f);letter-spacing:3px;color:var(--mut);flex:1}
+#conn{padding:4px 12px;border-radius:99px;font-size:12px;font-weight:700;background:#ff4040}
+#conn.on{background:#1f9d55}
+main{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,1fr);gap:18px;padding:18px 24px;max-width:1200px;margin:0 auto}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:16px;padding:16px}
+.card h2{margin:0 0 12px;font:13px var(--f);letter-spacing:3px;color:var(--mut)}
+.col{display:flex;flex-direction:column;gap:18px}
+#badge{display:inline-block;padding:6px 18px;border-radius:10px;font:26px var(--f);letter-spacing:2px;background:#444}
+#badge.demo{background:#555}#badge.intro{background:#a86a00}#badge.count{background:#c27c00}#badge.play{background:#1f9d55}#badge.result{background:var(--blue)}
+.paused{margin-left:10px;color:#ffc82e;font:18px var(--f);display:none}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.stat{background:rgba(0,0,0,.35);border-radius:10px;padding:8px;text-align:center}
+.stat small{display:block;font-size:10px;letter-spacing:2px;color:var(--mut);text-transform:uppercase}
+.stat b{font:24px var(--f);color:var(--cy)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button.b{padding:14px;border-radius:12px;border:1px solid var(--ln);background:rgba(255,255,255,.08);font:16px var(--f);letter-spacing:1px;cursor:pointer;transition:.1s}
+button.b:hover{background:rgba(255,255,255,.16)}button.b:active{transform:scale(.97)}
+button.b.pri{background:var(--blue);border-color:#4a52ff;grid-column:1/3;font-size:20px;box-shadow:0 0 20px rgba(26,34,255,.5)}
+button.b.dng{border-color:#a33;color:#ff8a8a}
+.set{display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center;margin-top:14px}
+.set label{color:var(--mut);font-size:13px}
+.set input,.set select{background:rgba(0,0,0,.4);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;width:110px;font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font:11px var(--f);letter-spacing:2px;color:var(--mut);padding:4px 6px}
+td{padding:7px 6px;border-top:1px solid var(--ln)}
+td.n{font-weight:700}.num{text-align:right;font-variant-numeric:tabular-nums}
+.on-d{display:inline-block;width:10px;height:10px;border-radius:50%;background:#555}.on-d.y{background:#3dff7a;box-shadow:0 0 8px #3dff7a}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:#1f9d55;font-weight:700}
+.kick{border:1px solid #a33;background:none;color:#ff8a8a;border-radius:8px;padding:3px 9px;cursor:pointer;font-size:12px}
+.kick:hover{background:#a33;color:#fff}
+.empty{color:var(--mut);text-align:center;padding:14px;font-size:14px}
+.lb td:first-child{width:36px;font:16px var(--f);color:var(--cy)}
+.join{display:flex;gap:16px;align-items:center}
+.join img{width:150px;height:150px;border-radius:12px;background:#fff;padding:6px}
+#url{font:18px var(--f);color:var(--cy);word-break:break-all}
+</style>
+</head>
+<body>
+<header><div class="brand">unifeob<b>.</b></div><h1>PAINEL DO ANFITRIÃO · OVNI x CAPIVARAS</h1><div id="conn">DESCONECTADO</div></header>
+<main>
+ <div class="col">
+  <section class="card">
+   <h2>ESTADO</h2>
+   <span id="badge">—</span><span class="paused" id="pzl">PAUSADO</span>
+   <div class="stats">
+    <div class="stat"><small>Tempo</small><b id="left">-</b></div>
+    <div class="stat"><small>FPS</small><b id="fps">-</b></div>
+    <div class="stat"><small>Capivaras</small><b id="caps">-</b></div>
+    <div class="stat"><small>Qualidade</small><b id="q">-</b></div>
+   </div>
+  </section>
+  <section class="card">
+   <h2>CONTROLES</h2>
+   <div class="btns">
+    <button class="b pri" data-k="start">INICIAR PRÓXIMO</button>
+    <button class="b" id="pause" data-k="pause">PAUSAR</button>
+    <button class="b" data-k="reset">RESETAR</button>
+    <button class="b dng" data-k="end" style="grid-column:1/3">ENCERRAR PARTIDA</button>
+   </div>
+   <div class="set">
+    <label for="time">Tempo da partida (30–600 s)</label><input id="time" type="number" min="30" max="600" step="5">
+    <label for="capn">Quantidade de capivaras (4–60)</label><input id="capn" type="number" min="4" max="60">
+    <label for="qual">Qualidade gráfica</label>
+    <select id="qual"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>AUTO</option></select>
+   </div>
+  </section>
+  <section class="card">
+   <h2>ENTRAR NO JOGO</h2>
+   <div class="join"><img src="/api/qr.svg" alt="QR do controle"><div><div class="empty" style="padding:0;text-align:left;margin-bottom:6px">Aponte a câmera ou abra:</div><div id="url">…</div></div></div>
+  </section>
+ </div>
+ <div class="col">
+  <section class="card">
+   <h2>JOGADORES (<span id="pc">0</span>)</h2>
+   <table><thead><tr><th></th><th>NOME</th><th>FILA</th><th class="num">PONTOS</th><th></th></tr></thead><tbody id="pl"></tbody></table>
+   <div class="empty" id="pe">Nenhum jogador conectado.</div>
+  </section>
+  <section class="card">
+   <h2>RANKING DO DIA</h2>
+   <table class="lb"><tbody id="lb"></tbody></table>
+   <div class="empty" id="le">Ranking vazio.</div>
+   <button class="b dng" id="clr" style="margin-top:10px;width:100%">LIMPAR RANKING</button>
+  </section>
+ </div>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const num=(v,d=0)=>Number.isFinite(+v)&&v!==null&&v!==''?+v:d;
+const pin=new URLSearchParams(location.search).get('pin')||'';
+let ws=null,retry=500,timer=0;
+const tx=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
+const cmd=(k,v)=>tx(v===undefined?{t:'cmd',k}:{t:'cmd',k,v});
+const NAMES={demo:'DEMO',intro:'INTRO',count:'CONTAGEM',play:'JOGANDO',result:'RESULTADO'};
+function conn(){
+ if(ws)return;
+ const w=ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
+ w.onopen=()=>{retry=500;tx({t:'hello',role:'admin',pin});const c=$('#conn');c.textContent='CONECTADO';c.className='on'};
+ w.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m&&typeof m==='object'){if(m.t==='adm')adm(m);else if(m.t==='lb')lb(m.lb)}};
+ w.onerror=()=>{};
+ w.onclose=()=>{ws=null;const c=$('#conn');c.textContent='RECONECTANDO…';c.className='';timer=setTimeout(conn,retry);retry=Math.min(3000,retry*1.5)};
+}
+const cell=(tr,txt,cls)=>{const td=document.createElement('td');if(cls)td.className=cls;td.textContent=txt;tr.appendChild(td);return td};
+function adm(m){
+ const st=String(m.st||'');
+ const b=$('#badge');b.textContent=NAMES[st]||st.toUpperCase()||'—';b.className=NAMES[st]?st:'';
+ $('#pzl').style.display=m.paused?'inline':'none';$('#pause').textContent=m.paused?'CONTINUAR':'PAUSAR';
+ const s=Math.max(0,Math.ceil(num(m.left)));
+ $('#left').textContent=(s/60|0)+':'+String(s%60).padStart(2,'0');
+ $('#fps').textContent=Math.round(num(m.fps));$('#caps').textContent=num(m.caps);
+ $('#q').textContent=String(m.q||'-').slice(0,6)+(m.auto?'*':'');
+ const act=document.activeElement;
+ if(act!==$('#time')&&m.dur)$('#time').value=Math.round(num(m.dur));
+ if(act!==$('#capn')&&m.caps!==undefined)$('#capn').value=num(m.caps);
+ if(act!==$('#qual')){const v=m.auto?'AUTO':String(m.q||'');if([...$('#qual').options].some(o=>o.value===v))$('#qual').value=v}
+ const ps=Array.isArray(m.players)?m.players.slice(0,60):[];
+ $('#pc').textContent=ps.length;$('#pe').style.display=ps.length?'none':'block';
+ const tb=$('#pl');tb.textContent='';
+ for(const p of ps){
+  if(!p||typeof p!=='object')continue;
+  const tr=document.createElement('tr');
+  const d=cell(tr,'');const i=document.createElement('span');i.className='on-d'+(p.on?' y':'');d.appendChild(i);
+  cell(tr,String(p.n||'?').slice(0,16),'n');
+  const f=cell(tr,'');
+  if(p.act){const t=document.createElement('span');t.className='tag';t.textContent='JOGANDO';f.appendChild(t)}
+  else f.textContent=num(p.pos)>0?'Nº '+num(p.pos):'—';
+  cell(tr,num(p.sc),'num');
+  const k=cell(tr,'');
+  if(num(p.pos)>0){const kb=document.createElement('button');kb.className='kick';kb.textContent='remover do jogo';kb.onclick=()=>cmd('kick',num(p.id));k.appendChild(kb)}
+  tb.appendChild(tr);
+ }
+}
+function lb(a){
+ const tb=$('#lb');tb.textContent='';a=Array.isArray(a)?a.slice(0,20):[];
+ $('#le').style.display=a.length?'none':'block';
+ a.forEach((r,i)=>{if(!r)return;const tr=document.createElement('tr');cell(tr,i+1);cell(tr,String(r.n||'?').slice(0,16),'n');cell(tr,num(r.s),'num');tb.appendChild(tr)});
+}
+for(const b of document.querySelectorAll('[data-k]'))b.onclick=()=>cmd(b.dataset.k);
+$('#clr').onclick=()=>{if(confirm('Limpar o ranking do dia?'))cmd('clearlb')};
+const clampN=(el,a,z)=>{const v=Math.min(z,Math.max(a,Math.round(num(el.value,a))));el.value=v;return v};
+$('#time').onchange=e=>cmd('time',clampN(e.target,30,600));
+$('#capn').onchange=e=>cmd('caps',clampN(e.target,4,60));
+$('#qual').onchange=e=>cmd('quality',e.target.value);
+fetch('/api/info').then(r=>r.json()).then(j=>{if(j&&typeof j.url==='string')$('#url').textContent=j.url}).catch(()=>{});
+conn();
+})();
+</script>
+</body>
+</html>
