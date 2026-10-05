@@ -146,7 +146,7 @@ code{display:block;font:700 calc(var(--u)*2) ui-monospace,Menlo,Consolas,monospa
   <div id="dbg" class="hide"></div>
 </div>
 <div id="loading">CARREGANDO CAMPUS…</div>
-<script>addEventListener("error",e=>{const l=document.getElementById("loading");if(l)l.textContent="ERRO: "+(e.message||e.filename||"falha ao carregar módulo")});addEventListener("unhandledrejection",e=>{const l=document.getElementById("loading");if(l)l.textContent="ERRO: "+(e.reason&&e.reason.message||e.reason)})</script>
+<script>(()=>{const show=t=>{const l=document.getElementById("loading");if(l){l.style.cssText+=";font-size:2.2vh;white-space:pre-wrap;padding:4vh;text-align:center";l.textContent="ERRO: "+t}};addEventListener("error",e=>show((e.target&&e.target.src||e.target&&e.target.href)?"falha ao carregar "+(e.target.src||e.target.href):[e.message,e.filename+":"+e.lineno,e.error&&e.error.stack].join("\n")),true);addEventListener("unhandledrejection",e=>show(String(e.reason&&(e.reason.stack||e.reason.message)||e.reason)))})()</script>
 <script type="module" src="/host/main.js"></script>
 </body>
 </html>
