@@ -66,5 +66,7 @@ config em public/host/config.js (pontuação, combo, tempo, velocidades, qualida
 ```
 
 ## Créditos dos modelos
+Capivara (`public/assets/lowpo+carpincho.FBX`): [Low Poly Capybara no CGTrader](https://www.cgtrader.com/free-3d-models/animal/mammal/low-poly-capybara), modelo gratuito usado sob os termos de licença informados na página do modelo.
+
 Vegetação, pedras e carros: [Kenney](https://kenney.nl) — Nature Kit e Car Kit, licença CC0 (`public/assets/*/LICENSE-Kenney-CC0.txt`). As cores são repintadas na paleta do campus em `public/host/nature.js`.
 
