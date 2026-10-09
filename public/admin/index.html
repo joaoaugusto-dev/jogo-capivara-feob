@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OVNI x CAPIVARAS - Admin</title>
+<title>CAPIVÁRIAS ABDUZIDAS - Admin</title>
 <style>
 *{box-sizing:border-box}
 :root{--bg:#07070d;--blue:#1a22ff;--cy:#2ef2ff;--tx:#eef1ff;--mut:#8890b8;--card:rgba(255,255,255,.05);--ln:rgba(255,255,255,.12);--f:Impact,'Arial Black','DejaVu Sans',sans-serif;--b:system-ui,'Segoe UI',Roboto,sans-serif}
@@ -50,7 +50,7 @@ td.n{font-weight:700}.num{text-align:right;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
-<header><div class="brand">unifeob<b>.</b></div><h1>PAINEL DO ANFITRIÃO · OVNI x CAPIVARAS</h1><div id="conn">DESCONECTADO</div></header>
+<header><div class="brand">unifeob<b>.</b></div><h1>PAINEL DO ANFITRIÃO · CAPIVÁRIAS ABDUZIDAS</h1><div id="conn">DESCONECTADO</div></header>
 <main>
  <div class="col">
   <section class="card">
@@ -73,7 +73,7 @@ td.n{font-weight:700}.num{text-align:right;font-variant-numeric:tabular-nums}
    </div>
    <div class="set">
     <label for="time">Tempo da partida (30–600 s)</label><input id="time" type="number" min="30" max="600" step="5">
-    <label for="capn">Quantidade de capivaras (4–60)</label><input id="capn" type="number" min="4" max="60">
+    <label for="capn">Quantidade de capivaras (4–200)</label><input id="capn" type="number" min="4" max="200">
     <label for="qual">Qualidade gráfica</label>
     <select id="qual"><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>AUTO</option></select>
    </div>
@@ -141,7 +141,7 @@ function adm(m){
   else f.textContent=num(p.pos)>0?'Nº '+num(p.pos):'—';
   cell(tr,num(p.sc),'num');
   const k=cell(tr,'');
-  if(num(p.pos)>0){const kb=document.createElement('button');kb.className='kick';kb.textContent='remover do jogo';kb.onclick=()=>cmd('kick',num(p.id));k.appendChild(kb)}
+  if(p.act){const kb=document.createElement('button');kb.className='kick';kb.textContent='remover do jogo';kb.onclick=()=>cmd('kick',typeof p.id==='string'?p.id:num(p.id));k.appendChild(kb)}
   tb.appendChild(tr);
  }
 }
@@ -154,7 +154,7 @@ for(const b of document.querySelectorAll('[data-k]'))b.onclick=()=>cmd(b.dataset
 $('#clr').onclick=()=>{if(confirm('Limpar o ranking do dia?'))cmd('clearlb')};
 const clampN=(el,a,z)=>{const v=Math.min(z,Math.max(a,Math.round(num(el.value,a))));el.value=v;return v};
 $('#time').onchange=e=>cmd('time',clampN(e.target,30,600));
-$('#capn').onchange=e=>cmd('caps',clampN(e.target,4,60));
+$('#capn').onchange=e=>cmd('caps',clampN(e.target,4,200));
 $('#qual').onchange=e=>cmd('quality',e.target.value);
 fetch('/api/info').then(r=>r.json()).then(j=>{if(j&&typeof j.url==='string')$('#url').textContent=j.url}).catch(()=>{});
 conn();

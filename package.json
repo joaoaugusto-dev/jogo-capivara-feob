@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "kiosk": "bash scripts/kiosk.sh"
+    "kiosk": "bash scripts/kiosk.sh",
+    "test": "node --test test/server.test.js",
+    "soak": "node test/soak.mjs"
   },
   "license": "UNLICENSED",
   "dependencies": {

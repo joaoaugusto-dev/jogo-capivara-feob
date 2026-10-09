@@ -1,8 +1,23 @@
-# 🛸 OVNI × CAPIVARAS — UniFEOB / UNIVERSO 2026
+# 🛸 CAPIVÁRIAS ABDUZIDAS — UniFEOB / UNIVERSO 2026
 
 Jogo 3D de feira no **campus da FEOB** (mapa digital + fotos aéreas). **O PC é o console** (renderiza tudo); **o celular é só o controle** (HTML leve via WebSocket, sem 3D).
 **Sem fila: até 4 pilotos ao mesmo tempo, em tela dividida que se adapta** (1 = tela cheia, 2 = lado a lado, 3–4 = quadrantes). Cada um tem seu próprio cronômetro e entra a qualquer momento pelo QR.
 Funciona 100% em rede local, sem internet, sem banco de dados.
+
+## Telas
+| Lobby (QR Code + ranking) | Tela dividida com 2 pilotos |
+|---|---|
+| ![Lobby](docs/screenshots/1-tela-inicial.png) | ![Jogando](docs/screenshots/2-jogando.png) |
+
+| Controle: montar o OVNI | Controle: jogando (paisagem) |
+|---|---|
+| ![Personalização](docs/screenshots/3-controle-celular.png) | ![Controle](docs/screenshots/4-controle-jogando.png) |
+
+**Painel do operador** (`/admin`):
+
+![Admin](docs/screenshots/5-admin.png)
+
+> O controle foi pensado para uso **na horizontal** (celular deitado): joystick à esquerda, turbo e raio à direita.
 
 ## Rodar
 ```bash
@@ -26,6 +41,13 @@ Salvo em **SQLite** no arquivo `data/ranking.db` (cria sozinho; muda com `RANKIN
 ## Teclado (testes / plano B sem celular)
 `Enter` entra como jogador local (TECLADO) · setas/WASD move · `Espaço` raio · `Shift` turbo · `P` pausa · `Esc` reseta · `1/2/3` qualidade LOW/MEDIUM/HIGH · `M` mudo · `F` FPS/draw calls
 
+## Testes e Docker
+```bash
+npm test           # servidor: HTTP, segurança, protocolo WebSocket, robustez
+npm run soak       # resistência no Chrome real: 4 bots, FPS, heap e vazamento de GPU (SOAK_MIN=30 para ensaio longo)
+docker build -t capivaras . && docker run -p 3000:3000 capivaras
+```
+
 ## Qualidade
 `LOW / MEDIUM / HIGH` (admin ou teclado). Por padrão fica em **AUTO**: começa em HIGH e desce sozinho se o FPS cair de 50 (com 2+ jogadores o MSAA é desligado e as sombras caem para 1024 automaticamente). Forçar: `/?q=MEDIUM&auto=0`.
 
@@ -33,7 +55,16 @@ Salvo em **SQLite** no arquivo `data/ranking.db` (cria sozinho; muda com `RANKIN
 ```
 server/index.js      HTTP estático + WebSocket + QR local + validação/rate-limit (protocolo documentado no topo)
 public/host/         jogo 3D (Three.js via importmap, sem bundler): world, campus, ufo, capy, fx, audio, ui, main
+public/host/nature.js  carrega os modelos Kenney e “assa” cor/AO no vértice; campus.js os agrupa em BatchedMesh por célula (1 draw por célula)
+public/assets/       capivara (FBX, rig procedural em capy.js), nature/ e cars/ (Kenney Nature Kit e Car Kit, CC0)
 public/join/         controle mobile (1 arquivo, sem dependências)
 public/admin/        painel do operador
+test/                testes do servidor (node:test) e soak test no Chrome
+docs/screenshots/    prints usados neste README
+scripts/kiosk.sh     abre o Chrome em modo quiosque
 config em public/host/config.js (pontuação, combo, tempo, velocidades, qualidade)
 ```
+
+## Créditos dos modelos
+Vegetação, pedras e carros: [Kenney](https://kenney.nl) — Nature Kit e Car Kit, licença CC0 (`public/assets/*/LICENSE-Kenney-CC0.txt`). As cores são repintadas na paleta do campus em `public/host/nature.js`.
+

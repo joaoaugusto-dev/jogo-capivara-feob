@@ -25,28 +25,13 @@ const lathe = (pts, seg = 36) => new THREE.LatheGeometry(new THREE.SplineCurve(p
 
 const shade = (hex, k) => new THREE.Color(hex).multiplyScalar(k).getHex();
 
-// ===================== CAPIVARA =====================
-// frente = +Z. Pivôs: cabeça em (0,.98,.72) do corpo; pernas nos quadris.
-export const CAPY_HEAD_PIVOT = [0, 0.98, 0.72];
-export const CAPY_LEGS = [[-0.3, 0.45, 0.5], [0.3, 0.45, 0.5], [-0.3, 0.45, -0.5], [0.3, 0.45, -0.5]];
-const PALETTES = [
-  { body: 0xa9743f, back: 0x946134, belly: 0xd4a66f, snout: 0xb88350, leg: 0x7d5029 },
-  { body: 0xb98349, back: 0xa26f3c, belly: 0xe0b57c, snout: 0xc5915a, leg: 0x8a5a30 },
-  { body: 0x93663a, back: 0x7e5430, belly: 0xc29560, snout: 0xa5774a, leg: 0x6b4524 },
-  { body: 0xffcf3a, back: 0xf0b21f, belly: 0xfff0a8, snout: 0xffdb62, leg: 0xe0a21a }, // dourada
-];
-const _capyGeo = {};
-export function capyGeos(pal = 0) {
-  if (_capyGeo[pal]) return _capyGeo[pal];
-  const c = PALETTES[pal], P = CAPY_HEAD_PIVOT;
-  const rel = (x, y, z) => [x - P[0], y - P[1], z - P[2]];
-  const body = merge([
-    part(SPHB, c.body, { p: [0, 0.82, 0], s: [0.62, 0.55, 0.92] }),
-    part(SPHB, c.back, { p: [0, 1.0, -0.05], s: [0.56, 0.4, 0.85] }),
-    part(SPHB, c.belly, { p: [0, 0.58, 0.05], s: [0.5, 0.35, 0.75] }),
-    part(SPH, 0x5a3a20, { p: [0, 0.86, -0.92], s: [0.12, 0.1, 0.1] }),
-  ]);
-  const head = merge([
+// ===================== CAPIVARA (cabeça do piloto) =====================
+// a capivara do campus é o modelo FBX com rig (capy.js); aqui só a cabeça estilizada que pilota o OVNI
+const CAPY_HEAD = { body: 0xa9743f, snout: 0xb88350, leg: 0x7d5029 };
+let _capyHead;
+function capyHead() {
+  const c = CAPY_HEAD, P = [0, 0.98, 0.72], rel = (x, y, z) => [x - P[0], y - P[1], z - P[2]];
+  return (_capyHead ||= merge([
     part(SPHB, c.body, { p: rel(0, 1.08, 1.0), s: [0.418, 0.405, 0.44] }),
     part(SPHB, c.snout, { p: rel(0, 0.98, 1.38), s: [0.32, 0.27, 0.34] }),
     part(SPH, 0x2a1c15, { p: rel(0, 1.07, 1.67), s: [0.21, 0.14, 0.14] }),
@@ -58,12 +43,7 @@ export function capyGeos(pal = 0) {
     part(SPH, 0xe89a86, { p: rel(0.37, 1.02, 1.17), s: [0.07, 0.05, 0.03] }),
     part(SPH, c.leg, { p: rel(-0.33, 1.43, 0.86), s: [0.1, 0.11, 0.07] }),
     part(SPH, c.leg, { p: rel(0.33, 1.43, 0.86), s: [0.1, 0.11, 0.07] }),
-  ]);
-  const leg = merge([
-    part(CYL, c.leg, { p: [0, -0.225, 0], s: [0.125, 0.45, 0.125] }),
-    part(SPH, 0x3a2616, { p: [0, -0.43, 0.05], s: [0.14, 0.08, 0.17] }),
-  ]);
-  return (_capyGeo[pal] = { body, head, leg });
+  ]));
 }
 // acessórios de cabeça (relativos ao pivô da cabeça): 1 laranja, 2 capelo de formatura
 export function capyHat(kind) {
@@ -97,7 +77,7 @@ function ufoMats(cfg) {
     dark: new THREE.MeshStandardMaterial({ color: 0x2a2e3d, metalness: 0.6, roughness: 0.4, envMapIntensity: 1.2, emissive: 0x151826, emissiveIntensity: 0.6 }),
     trim: new THREE.MeshStandardMaterial({ color: 0xe6eaf2, metalness: 0.55, roughness: 0.28, envMapIntensity: 1.5, emissive: 0x8a93a8, emissiveIntensity: 0.25 }),
     glowA: mk(glowCol.clone()), glowB: mk(glowCol.clone()),
-    glass: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(light).lerp(new THREE.Color(0xffffff), 0.6), transparent: true, opacity: 0.3, roughness: 0.04, metalness: 0, clearcoat: 1, envMapIntensity: 2.4, depthWrite: false }),
+    glass: new THREE.MeshPhysicalMaterial({ color: new THREE.Color(light).lerp(new THREE.Color(0xffffff), 0.6), transparent: true, opacity: 0.3, roughness: 0.08, metalness: 0, clearcoat: 1, envMapIntensity: 1.5, depthWrite: false }),
     alien: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55 }),
     vcol: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.5, roughness: 0.4 }),
     base: glowCol,
@@ -114,7 +94,7 @@ function bulbRing(n, radius, y, size, phase0, mats, parts = [[], []]) {
 
 // pilotos da cúpula: 0 alien verde · 1 alien roxo · 2 robô · 3 capivara
 function pilot(kind) {
-  if (kind === 3) { const g = capyGeos(0).head.clone(); g.scale(0.62, 0.62, 0.62); g.translate(0, 0.28, -0.28); return g; }
+  if (kind === 3) { const g = capyHead().clone(); g.scale(0.62, 0.62, 0.62); g.translate(0, 0.28, -0.28); return g; }
   if (kind === 2) return merge([
     part(BOX, 0xc9d1de, { p: [0, 0.3, 0], s: [0.62, 0.5, 0.52] }),
     part(BOX, 0x2a2e3d, { p: [0, 0.3, 0.27], s: [0.5, 0.2, 0.04] }),

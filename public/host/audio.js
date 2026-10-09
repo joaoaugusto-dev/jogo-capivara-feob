@@ -1,4 +1,12 @@
 // Áudio 100% procedural (WebAudio) — sem arquivos, sem internet.
+// setInterval em aba oculta é limitado a 1/s (ou 1/min); em Worker não é, então a música/jogo seguem na aba do admin
+export const bgTimer = (ms, fn) => {
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([`setInterval(()=>postMessage(0),${ms})`])));
+    w.onmessage = fn; return;
+  } catch { /* sem Worker: cai no timer comum */ }
+  setInterval(fn, ms);
+};
 const midi = (n) => 440 * 2 ** ((n - 69) / 12);
 const CHORDS = [[57, 60, 64, 67], [53, 57, 60, 64], [60, 64, 67, 71], [55, 59, 62, 69]]; // Am7 Fmaj7 Cmaj7 G6
 const BASS = [45, 41, 48, 43];
@@ -19,7 +27,7 @@ export class Sound {
       this.noise = nb;
       this.initLoops();
       this.nextT = c.currentTime + 0.1;
-      setInterval(() => this.schedule(), 30);
+      bgTimer(() => this.schedule(), 30);
     }
     this.ctx.resume();
     return this.ready;
@@ -37,7 +45,7 @@ export class Sound {
     this.beamLp = lp;
     this.flyG = c.createGain(); this.flyG.gain.value = 0; this.flyG.connect(this.sfx);
     const ns = c.createBufferSource(); ns.buffer = this.noise; ns.loop = true;
-    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 500; bp.Q.value = 0.8; ns.connect(bp); bp.connect(this.flyG); ns.start(); this.flyF = bp;
+    const bp = c.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 250; bp.Q.value = 0.4; ns.connect(bp); bp.connect(this.flyG); ns.start(); this.flyF = bp;
     // ambiente: vento suave + grilos do entardecer (loop contínuo, sem agendamento)
     const amb = (this.amb = c.createGain()); amb.gain.value = 0.7; amb.connect(this.master);
     const wn = c.createBufferSource(); wn.buffer = this.noise; wn.loop = true; wn.playbackRate.value = 0.6;
@@ -53,7 +61,8 @@ export class Sound {
     const hum = c.createOscillator(); hum.type = 'sine'; hum.frequency.value = 95; const hg = c.createGain(); hg.gain.value = 0.5; hum.connect(hg); hg.connect(this.flyG); hum.start(); this.hum = hum;
   }
   setBeam(k) { if (!this.ctx) return; const t = this.ctx.currentTime; this.beamG.gain.setTargetAtTime(k * 0.22 * this.sfxScale, t, 0.05); this.beamLp.frequency.setTargetAtTime(500 + k * 1500, t, 0.1); this.beamO[0].frequency.setTargetAtTime(60 + k * 25, t, 0.2); }
-  setFly(s, turbo) { if (!this.ctx) return; const t = this.ctx.currentTime, k = Math.min(1, s / 24); this.flyG.gain.setTargetAtTime((0.025 + k * 0.1 + (turbo ? 0.12 : 0)) * this.sfxScale, t, 0.1); this.flyF.frequency.setTargetAtTime(350 + k * 900 + (turbo ? 1200 : 0), t, 0.1); this.hum.frequency.setTargetAtTime(90 + k * 40, t, 0.15); }
+  // ponytail: ruído passa-baixa + zumbido grave, sem faixa aguda (era o chiado)
+  setFly(s, turbo) { if (!this.ctx) return; const t = this.ctx.currentTime, k = Math.min(1, s / 24); this.flyG.gain.setTargetAtTime((0.04 + k * 0.08 + (turbo ? 0.06 : 0)) * this.sfxScale, t, 0.25); this.flyF.frequency.setTargetAtTime(200 + k * 350 + (turbo ? 250 : 0), t, 0.25); this.hum.frequency.setTargetAtTime(85 + k * 35 + (turbo ? 20 : 0), t, 0.3); }
 
   // --- helpers ---
   tone(freq, t, dur, type = 'sine', vol = 0.2, dest = this.sfx, o = {}) {

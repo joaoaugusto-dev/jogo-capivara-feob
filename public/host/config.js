@@ -1,7 +1,7 @@
 // Tudo que é balanceamento/visual configurável fica aqui (admin sobrescreve parte em runtime).
 export const CFG = {
   matchSeconds: 120,
-  capyCount: 40,
+  capyCount: 90,
   // pontuação
   baseScore: 100,
   fastBonus: 50,       // captura rápida

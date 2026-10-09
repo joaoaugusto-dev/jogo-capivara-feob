@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#07070d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>OVNI x CAPIVARAS - Controle</title>
+<title>CAPIVÁRIAS ABDUZIDAS - Controle</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
 :root{--bg:#07070d;--blue:#1a22ff;--cy:#2ef2ff;--tx:#eef1ff;--mut:#8890b8;--card:rgba(255,255,255,.06);--ln:rgba(255,255,255,.12);--f:Impact,'Arial Black','DejaVu Sans',sans-serif}
@@ -120,6 +120,7 @@ main{flex:1;min-height:0;position:relative}
 .big.go{color:#3dff7a;text-shadow:0 0 40px #3dff7a}
 @keyframes pu{50%{transform:scale(1.07)}}
 .t1{font-size:min(7vw,5vh,26px);letter-spacing:2px}
+#how{background:var(--cyan,#2ef2ff);color:#07070d;border-radius:12px;padding:10px 12px;text-align:center;font-weight:700;font-size:15px;letter-spacing:1px}#how small{display:block;font-weight:400;font-size:12px;letter-spacing:0;margin-top:3px}
 .t2{font-size:13px;letter-spacing:3px;color:var(--mut)}
 /* CONTROLE */
 #s-play{flex-direction:column}
@@ -174,6 +175,7 @@ main{flex:1;min-height:0;position:relative}
 <header><div class="brand">unifeob<b>.</b></div><div class="uni">UNIVERSO 2026</div><div id="dot" class="dot"></div></header>
 <main>
  <section id="s-cfg" class="scr on">
+  <div id="how">📺 O JOGO ACONTECE NO TELÃO<small>Seu celular vira o CONTROLE. Monte seu OVNI e olhe para o telão!</small></div>
   <div id="pv"><div class="ufo" id="ufo"><div class="beam"></div><div class="fx"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="dome"><div class="ant"></div><div class="holo"></div></div><div class="ring"></div><div class="hull"><div class="det"></div><div class="lt"><i></i><i></i><i></i><i></i><i></i></div></div></div></div>
   <div id="nm"><input id="name" maxlength="12" placeholder="SEU NOME" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done"></div>
   <div id="sel">
@@ -193,7 +195,7 @@ main{flex:1;min-height:0;position:relative}
   <div class="t2">VAGA NO TELÃO</div>
   <div class="big" id="wn">…</div>
   <div class="t1" id="wt">AGUARDANDO O TELÃO…</div>
-  <div class="t2">OLHE PARA O TELÃO E GIRE O CELULAR</div>
+  <div class="t2">📺 OLHE PARA O TELÃO — O CELULAR É O CONTROLE</div>
   <button id="alt" class="btn ghost">ALTERAR OVNI</button>
  </section>
  <section id="s-play" class="scr">
@@ -311,7 +313,7 @@ function onMsg(m){
   case 'st':onSt(m);break;
   case 'h':hud(m);break;
   case 'pz':paused=m.v?1:0;$('#pz').classList.toggle('on',!!paused);if(paused)zero();break;
-  case 'ev':if(m.k==='cap')cap(num(m.p),num(m.cb));break;
+  case 'ev':if(m.k==='cap')cap(num(m.p),num(m.cb));else if(m.k==='hv')buzz(Math.round(15+Math.min(1,num(m.v))*85));break;
  }
 }
 const fmt=s=>{s=Math.max(0,Math.ceil(s));return (s/60|0)+':'+String(s%60).padStart(2,'0')};
@@ -326,7 +328,9 @@ function ov(t,b,s,cls){
 }
 const ovOff=()=>$('#ov').classList.remove('on');
 let fullT=0;
+let lastSt='';
 function onSt(m){
+ const k=JSON.stringify(m);if(k===lastSt&&m.st!=='full')return;lastSt=k; // mesmo estado repetido (ex.: host reconectando) não refaz o aviso
  if(m.st!=='full'&&fullT){clearInterval(fullT);fullT=0}
  switch(m.st){
   case 'full':if(!editing){show('wait');$('#wn').textContent='4/4';$('#wt').textContent='MESA CHEIA — ENTRANDO ASSIM QUE ABRIR VAGA';if(!fullT)fullT=setInterval(()=>tx({t:'q'}),2500)}break;

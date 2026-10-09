@@ -26,6 +26,7 @@ void main(){
 }`;
 
 const lerp = (a, b, t) => a + (b - a) * t;
+const TAU = Math.PI * 2, smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const h2 = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
 export function vnoise(x, y) {
   const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
@@ -35,7 +36,7 @@ export function vnoise(x, y) {
 export class World {
   constructor(renderer, scene, fx) {
     this.renderer = renderer; this.scene = scene; this.fx = fx;
-    scene.fog = new THREE.Fog(new THREE.Color().setRGB(...HORIZON, THREE.SRGBColorSpace), 200, 1500);
+    scene.fog = new THREE.FogExp2(new THREE.Color().setRGB(...HORIZON, THREE.SRGBColorSpace), 0.00095); // perspectiva atmosférica: o longe se funde ao horizonte
     scene.background = scene.fog.color;
 
     this.skyU = { uSun: { value: SUN }, uTime: { value: 0 } };
@@ -49,7 +50,7 @@ export class World {
     this.hemi = new THREE.HemisphereLight(0xffd0a8, 0x6a5090, 1.0); scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffb272, 3.3);
     this.sun.castShadow = true; this.sun.shadow.camera.near = 10; this.sun.shadow.camera.far = 380;
-    this.sun.shadow.bias = -0.0005; this.sun.shadow.normalBias = 0.06;
+    this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.05; this.sun.shadow.radius = 2.2; // PCF com disco de Vogel: borda macia
     const sc = this.sun.shadow.camera; sc.left = -66; sc.right = 66; sc.top = 66; sc.bottom = -66;
     scene.add(this.sun, this.sun.target);
     this.fill = new THREE.DirectionalLight(0x7f9bff, 0.55); this.fill.position.copy(SUN).multiplyScalar(-100); scene.add(this.fill);
@@ -89,7 +90,14 @@ export class World {
     }
     for (let i = 0; i < 24; i++) { x.fillStyle = 'rgba(60,85,40,.16)'; x.beginPath(); x.ellipse(Math.random() * 512, Math.random() * 512, 18 + Math.random() * 30, 10 + Math.random() * 18, Math.random() * 3, 0, 7); x.fill(); }
     const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(SX / 4, SZ / 4); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
-    this.ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, roughness: 1, metalness: 0 }));
+    const gm = new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, roughness: 1, metalness: 0 });
+    gm.onBeforeCompile = (sh) => { // anti-repetição: mistura a textura em duas escalas/rotações por ruído de baixa frequência
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `
+        vec2 gu = vMapUv; float gn = sin(gu.x * 0.11) * sin(gu.y * 0.13) + sin(gu.x * 0.037 + gu.y * 0.05) ;
+        vec4 ga = texture2D(map, gu), gb = texture2D(map, mat2(0.8, -0.6, 0.6, 0.8) * gu * 0.31 + 0.37);
+        diffuseColor *= mix(ga, gb, smoothstep(-0.6, 0.6, gn)) * (0.88 + 0.16 * sin(gu.x * 0.043 - gu.y * 0.061 + gn));`);
+    };
+    this.ground = new THREE.Mesh(g, gm);
     this.ground.receiveShadow = true; scene.add(this.ground);
     const far = new THREE.Mesh(new THREE.CircleGeometry(3000, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4a8a44, roughness: 1 }));
     far.position.y = -0.08; scene.add(far);
@@ -111,12 +119,37 @@ export class World {
       bm.setMatrixAt(i, m); col.setHSL(0.72 + rnd() * 0.06, 0.25, 0.7 + rnd() * 0.3); bm.setColorAt(i, col);
     }
     bm.frustumCulled = false; sky.add(bm);
-    const hm = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 10, 0, 6.283, 0, 1.6), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x1a2a10 }), 30);
-    for (let i = 0; i < 30; i++) {
-      const a = (i / 30) * 6.283 + rnd() * 0.2, [x, z] = ring(560 + rnd() * 150, 380 + rnd() * 120, a), w = 90 + rnd() * 120;
-      m.compose(new THREE.Vector3(x, -2, z), q.identity(), new THREE.Vector3(w, 12 + rnd() * 22, w * 0.8)); hm.setMatrixAt(i, m); col.setHSL(0.27 + rnd() * 0.05, 0.38, 0.3 + rnd() * 0.1); hm.setColorAt(i, col);
+    // colinas: anel contínuo low-poly entre a mata e a cidade (antes: 30 calotas de esfera = "bolhas")
+    for (let i = 0; i < 30 * 7; i++) rnd(); // ponytail: consome o que as calotas consumiam → montanhas e nuvens seguem no mesmo lugar
+    const HI = [520, 380], HK = 1.6; // elipse interna (m) e quanto a externa é maior: termina colada na cidade (skyline em k≈1.58–1.9)
+    const hillAt = (a, u) => { // a: ângulo, u: 0 borda interna → 1 externa; ruído no círculo unitário = sem emenda
+      if (u <= 0 || u >= 1) return -1;
+      const env = smooth(0, 0.55, u) * (1 - smooth(0.9, 1, u)), cx = Math.cos(a), cz = Math.sin(a); // cume perto da borda externa: esconde a base dos prédios
+      const big = vnoise(cx * 3.2 + u * 1.3 + 7, cz * 3.2 + u * 0.9), mid = vnoise(cx * 9 + u * 3, cz * 9 - u * 2 + 4), fine = vnoise(cx * 30 + u * 9, cz * 30 + 11);
+      return env * (6 + 46 * big ** 1.6 + 12 * mid + 3 * fine) - 1.5;
+    };
+    const hillH = (x, z) => { const k = Math.hypot(x / HI[0], z / HI[1]); return hillAt(Math.atan2(z / HI[1], x / HI[0]), (k - 1) / (HK - 1)); };
+    {
+      const NA = 240, NU = 26, pos = [], clr = [], c = new THREE.Color();
+      const LOW = new THREE.Color(0x4e9d44), MID = new THREE.Color(0x6aa64a), TOP = new THREE.Color(0xb3b95e), WOOD = new THREE.Color(0x2f6a36);
+      const vert = (i, j) => {
+        const a = (i / NA) * TAU, u = j / NU, k = 1 + (HK - 1) * u, x = Math.cos(a) * HI[0] * k, z = Math.sin(a) * HI[1] * k, y = hillAt(a, Math.min(0.9999, Math.max(1e-4, u)));
+        const t = Math.max(0, y) / 45;
+        c.copy(LOW).lerp(MID, Math.min(1, t * 2.2)).lerp(TOP, Math.max(0, t - 0.35) * 1.4);
+        if (vnoise(x * 0.018 + 3, z * 0.018) > 0.62) c.lerp(WOOD, 0.75); // manchas de mata
+        c.multiplyScalar(0.92 + 0.16 * vnoise(x * 0.09, z * 0.09));
+        return [x, y, z, c.r, c.g, c.b];
+      };
+      for (let i = 0; i < NA; i++) for (let j = 0; j < NU; j++) {
+        const A = vert(i, j), B = vert(i + 1, j), C = vert(i + 1, j + 1), D = vert(i, j + 1);
+        for (const v of [A, B, C, A, C, D]) { pos.push(v[0], v[1], v[2]); clr.push(v[3], v[4], v[5]); }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(clr, 3)); g.computeVertexNormals();
+      const hills = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: 0x16200e }));
+      hills.frustumCulled = false; sky.add(hills);
     }
-    hm.frustumCulled = false; sky.add(hm);
+    this.campus.cull((x, z) => hillH(x, z) > 0.8); // árvore só onde a colina ainda é chão
     const mm = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7, 1).translate(0, 0.5, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x30204a, flatShading: true }), 26);
     for (let i = 0; i < 26; i++) {
       const a = (i / 26) * 6.283 + rnd() * 0.1, [x, z] = ring(1250 + rnd() * 200, 950 + rnd() * 150, a), w = 260 + rnd() * 260;
@@ -161,10 +194,10 @@ export class World {
   // `from`: posição ou lista de posições a evitar
   randomSpot(from, minDist = 0) {
     const list = from ? (Array.isArray(from) ? from : [from]) : [];
-    const near = list.length ? list[(Math.random() * list.length) | 0] : null; // 65% das capivaras nascem ao alcance de algum jogador
+    const near = list.length ? list[(Math.random() * list.length) | 0] : null; // 40% das capivaras nascem ao alcance de algum jogador
     for (let i = 0; i < 90; i++) {
       const [x, z] = this.campus.sampleZone();
-      if (near && i < 60 && Math.random() < 0.65 && Math.hypot(x - near.x, z - near.z) > 170) continue;
+      if (near && i < 60 && Math.random() < 0.4 && Math.hypot(x - near.x, z - near.z) > 250) continue;
       if (Math.abs(x) > 375 || Math.abs(z) > 210 || this.isBlocked(x, z, 1.6)) continue;
       if (list.some((p) => Math.hypot(x - p.x, z - p.z) < minDist)) continue;
       return { x, z };

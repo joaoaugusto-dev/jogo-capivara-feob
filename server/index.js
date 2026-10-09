@@ -1,4 +1,4 @@
-// OVNI x CAPIVARAS — servidor da feira. Sem banco, sem internet: tudo em memória na rede local.
+// CAPIVÁRIAS ABDUZIDAS — servidor da feira. Sem banco, sem internet: tudo em memória na rede local.
 //
 // PROTOCOLO WebSocket (JSON compacto, endpoint /ws)
 //  Cliente -> servidor (primeira mensagem sempre "hello"):
@@ -58,9 +58,19 @@ function lanIPs() {
   return out.sort((a, b) => rank(a) - rank(b));
 }
 const localAddrs = () => new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', ...lanIPs(), ...lanIPs().map((i) => '::ffff:' + i)]);
-const isLocal = (req) => localAddrs().has(req.socket.remoteAddress);
+// ponytail: túnel/proxy conecta por localhost mas anexa x-forwarded-for/cf-connecting-ip; nesse caso NÃO é local (exige PIN)
+const isLocal = (req) => !req.headers['x-forwarded-for'] && !req.headers['cf-connecting-ip'] && localAddrs().has(req.socket.remoteAddress);
 const hostIP = () => process.env.HOST_IP || lanIPs()[0] || 'localhost';
-const joinURL = () => `http://${hostIP()}:${PORT}/join`;
+// ponytail: atrás de proxy/túnel (Ports do VS Code, ngrok) usa o host da requisição; JOIN_URL força um valor
+const joinURL = (req) => {
+  if (process.env.JOIN_URL) return process.env.JOIN_URL;
+  const h = req?.headers['x-forwarded-host'] || req?.headers.host || '';
+  if (h && !/^(localhost|127\.|\[::1\]|\d+\.\d+\.\d+\.\d+)/.test(h)) {
+    const proto = req.headers['x-forwarded-proto']?.split(',')[0] || (req.socket.encrypted ? 'https' : /\.(devtunnels\.ms|ngrok|app\.github\.dev)/.test(h) ? 'https' : 'http');
+    return `${proto}://${h}/join`;
+  }
+  return `http://${hostIP()}:${PORT}/join`;
+};
 
 // ---------- http estático ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -71,34 +81,43 @@ function send(res, code, body, type = 'text/plain; charset=utf-8') {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
   res.end(body);
 }
-function serveFile(res, file) {
-  fs.readFile(file, (err, data) => (err ? send(res, 404, 'not found') : send(res, 200, data, MIME[path.extname(file)] || 'application/octet-stream')));
+// no-cache + Last-Modified: o navegador revalida e recebe 304 em vez de baixar de novo os ~3.5 MB de modelos a cada F5
+function serveFile(req, res, file) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) return send(res, 404, 'not found');
+    const lm = st.mtime.toUTCString(), head = { 'Cache-Control': 'no-cache', 'Last-Modified': lm };
+    if (req.headers['if-modified-since'] === lm) { res.writeHead(304, head); return res.end(); }
+    res.writeHead(200, { ...head, 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Content-Length': st.size });
+    fs.createReadStream(file).on('error', () => res.destroy()).pipe(res); // sem listener, EACCES/EISDIR derrubaria o processo
+  });
 }
 function safeJoin(base, rel) {
   const f = path.normalize(path.join(base, rel));
-  return f.startsWith(base) ? f : null;
+  return f.startsWith(base + path.sep) ? f : null;
 }
 
-const server = http.createServer(async (req, res) => {
+// URL malformada (%E0%A4%A) fazia decodeURIComponent lançar → promise rejeitada → Node derrubava o servidor
+const server = http.createServer((req, res) => route(req, res).catch((e) => { console.error('[http]', req.url, e.message); if (!res.headersSent) send(res, 400, 'bad request'); else res.destroy(); }));
+async function route(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = decodeURIComponent(url.pathname);
   if (p === '/favicon.ico') { res.writeHead(204); return res.end(); }
   if (p === '/api/info') {
     const local = isLocal(req);
-    return send(res, 200, JSON.stringify({ url: joinURL(), ips: lanIPs(), port: PORT, local, lb: getLB() }), MIME['.json']);
+    return send(res, 200, JSON.stringify({ url: joinURL(req), ips: lanIPs(), port: PORT, local, lb: getLB() }), MIME['.json']);
   }
   if (p === '/api/qr.svg') {
-    const svg = await QRCode.toString(joinURL(), { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    const svg = await QRCode.toString(joinURL(req), { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
     return send(res, 200, svg, MIME['.svg']);
   }
-  if (PAGES[p]) return serveFile(res, path.join(PUB, PAGES[p]));
+  if (PAGES[p]) return serveFile(req, res, path.join(PUB, PAGES[p]));
   if (p.startsWith('/vendor/three/')) {
     const f = safeJoin(THREE, p.slice('/vendor/three/'.length));
-    return f ? serveFile(res, f) : send(res, 403, 'forbidden');
+    return f ? serveFile(req, res, f) : send(res, 403, 'forbidden');
   }
   const f = safeJoin(PUB, p);
-  return f ? serveFile(res, f) : send(res, 403, 'forbidden');
-});
+  return f ? serveFile(req, res, f) : send(res, 403, 'forbidden');
+}
 
 // ---------- websocket ----------
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
@@ -117,6 +136,7 @@ const cleanName = (s) => String(s ?? '').replace(/[^\p{L}\p{N} _.-]/gu, '').trim
 function validCfg(m) {
   return { m: int(m.m, 4), c: int(m.c, 11), s: int(m.s, 3), l: int(m.l, 7), b: int(m.b, 5), e: int(m.e, 5), a: int(m.a, 7), p: int(m.p, 3) };
 }
+function forget(p) { clearTimeout(p.gone); players.delete(p.id); byTok.delete(p.tok); tx(host, { t: 'gone', id: p.id }); }
 function pushLB() {
   const m = { t: 'lb', lb: getLB() };
   tx(host, m);
@@ -132,12 +152,14 @@ wss.on('connection', (ws, req) => {
     let m;
     try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m !== 'object') return;
-
+    try { onMessage(m); } catch (e) { console.error('[ws]', e.message); } // ex.: SQLite travado/disco cheio não pode derrubar a feira
+  });
+  function onMessage(m) {
     if (!me) {
       if (m.t !== 'hello') return;
       clearTimeout(hello);
       if (m.role === 'host') {
-        if (!local) return ws.close(4003, 'host só de localhost');
+        if (!local && !(ADMIN_PIN && m.pin === ADMIN_PIN)) return ws.close(4003, 'host negado (use ?pin=)');
         if (host && host !== ws) host.close(4000, 'novo host');
         host = ws; me = { role: 'host' };
         tx(ws, { t: 'lb', lb: getLB() });
@@ -154,7 +176,11 @@ wss.on('connection', (ws, req) => {
           if (p.ws && p.ws !== ws) p.ws.close(4001, 'outra aba');
           p.ws = ws;
         } else {
-          if (players.size >= MAX_PLAYERS) return ws.close(4002, 'lotado');
+          if (players.size >= MAX_PLAYERS) { // lotado: libera a vaga de quem já fechou o controle (senão uma turma escaneando trava 2 min)
+            const off = [...players.values()].find((q) => !q.ws);
+            if (!off) return ws.close(4002, 'lotado');
+            forget(off);
+          }
           p = { id: nextId++, tok: randomBytes(9).toString('base64url'), ws, name: 'VISITANTE', cfg: validCfg({}), last: 0, n: 0, win: 0 };
           players.set(p.id, p); byTok.set(p.tok, p);
         }
@@ -194,7 +220,7 @@ wss.on('connection', (ws, req) => {
       else if (to === '*') players.forEach((p) => tx(p.ws, msg));
       else if (players.has(to)) tx(players.get(to).ws, msg);
     }
-  });
+  }
 
   ws.on('close', () => {
     clearTimeout(hello);
@@ -204,9 +230,9 @@ wss.on('connection', (ws, req) => {
     else if (me.role === 'player' && me.p.ws === ws) {
       me.p.ws = null;
       tx(host, { t: 'leave', id: me.p.id });
-      // esquece o jogador depois de 2 min sem reconectar
+      // esquece o jogador depois de 2 min sem reconectar (um timer por jogador: reconectar e cair de novo reinicia a contagem)
       const p = me.p;
-      setTimeout(() => { if (!p.ws) { players.delete(p.id); byTok.delete(p.tok); tx(host, { t: 'gone', id: p.id }); } }, 120000);
+      clearTimeout(p.gone); p.gone = setTimeout(() => !p.ws && forget(p), 120000);
     }
   });
   ws.on('error', () => {});
@@ -214,7 +240,7 @@ wss.on('connection', (ws, req) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   const ips = lanIPs();
-  console.log('\n  🛸  OVNI x CAPIVARAS — servidor no ar\n');
+  console.log('\n  🛸  CAPIVÁRIAS ABDUZIDAS — servidor no ar\n');
   console.log(`  TELA (abrir no PC da feira):  http://localhost:${PORT}/`);
   console.log(`  CONTROLE (QR / celular):      ${joinURL()}`);
   console.log(`  ADMIN (só neste PC):          http://localhost:${PORT}/admin`);

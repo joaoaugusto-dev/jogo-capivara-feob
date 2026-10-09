@@ -7,8 +7,8 @@ import { CFG, QUALITY, DEFAULT_PLAYER_CFG } from './config.js';
 import { FX } from './fx.js';
 import { World } from './world.js';
 import { Ufo } from './ufo.js';
-import { Capys } from './capy.js';
-import { Sound } from './audio.js';
+import { Capys, loadCapy } from './capy.js';
+import { Sound, bgTimer } from './audio.js';
 import { Net } from './net.js';
 import { ui } from './ui.js';
 
@@ -19,7 +19,15 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 // ---------- renderer / cena ----------
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); } catch (e) {
+  // sem WebGL (driver caiu e o Chrome desligou a GPU): instrução clara na tela e nova tentativa sozinha
+  console.warn('[webgl]', e);
+  const m = document.getElementById('ld-msg');
+  if (m) m.textContent = 'O NAVEGADOR NÃO CONSEGUIU USAR A PLACA DE VÍDEO (WebGL).\n\nFeche TODAS as janelas do Chrome e abra de novo (npm run kiosk).\nSe continuar: em chrome://gpu precisa aparecer "WebGL: Hardware accelerated".\n\nTentando de novo em 15 s…';
+  setTimeout(() => location.reload(), 15000);
+  await new Promise(() => {}); // para o módulo aqui, sem cair na tela de erro genérica
+}
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x140b28, 1); // célula vazia da tela dividida fica opaca (evita NaN/branco no bloom)
 const scene = new THREE.Scene();
@@ -84,9 +92,9 @@ const mmx = (x) => ((x + MMB.x) / (2 * MMB.x)) * MMW, mmz = (z) => ((z + MMB.z) 
 const mmBg = (() => {
   const c = document.createElement('canvas'); c.width = MMW; c.height = MMH; const g = c.getContext('2d'), cp = world.campus;
   g.fillStyle = '#2f6b3a'; g.fillRect(0, 0, MMW, MMH);
-  g.strokeStyle = '#9a9ca6'; g.lineCap = 'round';
-  for (const [x1, z1, x2, z2, w] of cp.segs) { g.lineWidth = Math.max(1.5, w * mmk); g.beginPath(); g.moveTo(mmx(x1), mmz(z1)); g.lineTo(mmx(x2), mmz(z2)); g.stroke(); }
-  g.fillStyle = '#7d808a'; for (const l of cp.lots) { g.save(); g.translate(mmx(l.cx), mmz(l.cz)); g.rotate(l.rot); g.fillRect(-l.W * mmk / 2, -l.D * mmk / 2, l.W * mmk, l.D * mmk); g.restore(); }
+  g.strokeStyle = '#d6d8e0'; g.lineCap = 'round';
+  for (const [x1, z1, x2, z2, w] of cp.segs) { g.lineWidth = Math.max(3, w * mmk); g.beginPath(); g.moveTo(mmx(x1), mmz(z1)); g.lineTo(mmx(x2), mmz(z2)); g.stroke(); }
+  g.fillStyle = '#5b5e6b'; for (const l of cp.lots) { g.save(); g.translate(mmx(l.cx), mmz(l.cz)); g.rotate(l.rot); g.fillRect(-l.W * mmk / 2, -l.D * mmk / 2, l.W * mmk, l.D * mmk); g.restore(); }
   g.fillStyle = '#3aa0d6'; for (const e of cp.ellipses) { g.beginPath(); g.ellipse(mmx(e.x), mmz(e.z), e.rx * mmk, e.rz * mmk, 0, 0, 7); g.fill(); }
   for (const b of world.rects) { if (!b.col) continue; g.save(); g.translate(mmx(b.x), mmz(b.z)); g.rotate(b.rot); g.fillStyle = '#' + b.col.toString(16).padStart(6, '0'); g.fillRect(-b.hw * mmk, -b.hd * mmk, b.hw * 2 * mmk, b.hd * 2 * mmk); g.restore(); }
   return c;
@@ -95,8 +103,8 @@ const SLOT_COL = ['#2ef2ff', '#ff7ab8', '#7cff6b', '#ffc82e'];
 function drawMinimap(p) {
   const v = ui.views[p.slot], g = v.mctx; if (v.mm.width !== MMW) { v.mm.width = MMW; v.mm.height = MMH; }
   g.drawImage(mmBg, 0, 0);
-  for (const c of capys.list) { if (c.state === 'gone' || c.state === 'spawn') continue; g.fillStyle = c.golden ? '#ffe14d' : '#ffb347'; g.beginPath(); g.arc(mmx(c.x), mmz(c.z), c.golden ? 4.5 : 3, 0, 7); g.fill(); g.strokeStyle = '#3a1d00'; g.lineWidth = 1; g.stroke(); }
-  for (const q of activeList()) { const u = q.ufo, me = q === p; g.save(); g.translate(mmx(u.pos.x), mmz(u.pos.z)); g.rotate(u.yaw); g.fillStyle = SLOT_COL[q.slot]; g.strokeStyle = me ? '#fff' : '#000'; g.lineWidth = me ? 2.2 : 1; const s = me ? 8 : 5.5; g.beginPath(); g.moveTo(0, s); g.lineTo(-s * 0.7, -s * 0.7); g.lineTo(s * 0.7, -s * 0.7); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+  for (const c of capys.list) { if (c.state === 'gone' || c.state === 'spawn') continue; g.fillStyle = c.golden ? '#ffe14d' : '#ffb347'; g.beginPath(); g.arc(mmx(c.x), mmz(c.z), c.golden ? 7 : 5, 0, 7); g.fill(); g.strokeStyle = '#2a1500'; g.lineWidth = 1.8; g.stroke(); }
+  for (const q of activeList()) { const u = q.ufo, me = q === p; g.save(); g.translate(mmx(u.pos.x), mmz(u.pos.z)); g.rotate(-u.yaw); g.fillStyle = SLOT_COL[q.slot]; g.strokeStyle = me ? '#fff' : '#000'; g.lineWidth = me ? 3 : 1.6; const s = me ? 12 : 8.5; g.beginPath(); g.moveTo(0, s); g.lineTo(-s * 0.7, -s * 0.7); g.lineTo(s * 0.7, -s * 0.7); g.closePath(); g.fill(); g.stroke(); g.restore(); }
 }
 function updateGuides(p, t) {
   const v = ui.views[p.slot];
@@ -137,7 +145,7 @@ function beforeView(v) { for (const u of pool) if (u.name) u.tag.visible = u !==
 let quality = (params.get('q') || 'HIGH').toUpperCase(), auto = params.get('auto') !== '0', prScale = 1;
 let composer = null, bloom = null, composerMsaa = -1;
 function buildComposer(msaa) {
-  composer?.dispose();
+  composer?.passes.forEach((p) => p.dispose()); composer?.dispose(); // EffectComposer.dispose não libera os passes (bloom = ~11 render targets)
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
   composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: msaa }));
   composer.addPass(new MultiViewPass());
@@ -169,7 +177,9 @@ let lb = [], paused = false, layoutKey = '';
 const flags = { debug: params.has('debug') };
 const activeList = () => act.filter(Boolean);
 
-const net = new Net(onMsg, (ok) => { if (ok) players.forEach((p) => sendState(p)); });
+// conexão caiu (servidor reiniciou): todos os celulares ficam offline até o servidor reenviar o 'join' — senão viram
+// fantasmas que seguram as 4 vagas até o fim da partida
+const net = new Net(onMsg, (ok) => players.forEach((p) => { if (ok) sendState(p); else if (typeof p.id === 'number' && p.online) { p.online = false; p.offAt = performance.now(); } }));
 const send = (to, o) => { if (typeof to === 'number') net.send({ to, ...o }); }; // teclado/controles físicos têm id texto: não há celular para avisar
 
 function onMsg(m) {
@@ -201,11 +211,11 @@ function command(k, v) {
   else if (k === 'reset') { activeList().forEach((p) => { send(p.id, { t: 'st', st: 'idle' }); leave(p, true); }); }
   else if (k === 'end') activeList().forEach((p) => p.state === 'play' && endMatch(p));
   else if (k === 'time' && v >= 30 && v <= 600) CFG.matchSeconds = v | 0;
-  else if (k === 'caps' && v >= 4 && v <= 80) { CFG.capyCount = v | 0; capys.setCount(CFG.capyCount); }
+  else if (k === 'caps' && v >= 4 && v <= 200) CFG.capyCount = v | 0; // stepSim ajusta a quantidade
   else if (k === 'quality') { if (v === 'AUTO') auto = true; else if (QUALITY[v]) { auto = false; applyQuality(v); } }
   else if (k === 'kick') { const p = players.get(v) || players.get(String(v)); if (p?.active) { send(p.id, { t: 'st', st: 'idle' }); leave(p, true); } }
 }
-function setPause(b) { paused = b; ui.pause(b); }
+function setPause(b) { paused = b; ui.pause(b); net.send({ to: '*', t: 'pz', v: b ? 1 : 0 }); }
 
 // ---------- entrada / saída da partida (sem fila: até 4 simultâneos) ----------
 function join(p) {
@@ -382,9 +392,11 @@ function stepPlayer(p, dt) {
   }
   if (p.active) u.step(dt, wx, wz, beam, turbo);
 }
+const capTarget = (n) => Math.round(CFG.capyCount * Math.min(1, Math.max(2, n) / 4)); // CFG.capyCount = quantidade com 4 jogadores
 function stepSim(dt) {
   startleCd -= dt;
   const list = activeList();
+  capys.setCount(capTarget(list.length));
   if (!list.length) { // demonstração
     const u = pool[0]; aiThink(dt, u);
     demoCfgT -= dt; if (demoCfgT <= 0) { demoCfgT = 14; u.setCfg(DEMO_CFGS[demoCfgI++ % DEMO_CFGS.length]); }
@@ -394,6 +406,16 @@ function stepSim(dt) {
   }
   for (const p of list) stepPlayer(p, dt);
   capys.step(dt, activeList().map((p) => p.ufo));
+  for (const p of list) { // vibração crescente enquanto uma capivara sobe no raio
+    let v = 0;
+    for (const c of capys.list) if (c.state === 'abducted' && c.owner === p.ufo) v = Math.max(v, Math.min(1, c.y / (p.ufo.pos.y - 1.5)));
+    p.hvT = (p.hvT || 0) - dt;
+    if (v <= 0 || p.hvT > 0) continue;
+    p.hvT = 0.14;
+    p.cam.shake = Math.max(p.cam.shake, v * 0.3);
+    if (p.pad !== undefined) rumble(p, 140, v * 0.6, v * 0.4);
+    send(p.id, { t: 'ev', k: 'hv', v: +v.toFixed(2) });
+  }
 }
 
 // ---------- layout da tela dividida ----------
@@ -431,6 +453,10 @@ let last = performance.now(), acc = 0, T = 0, frames = 0, fpsT = 0, fps = 60, lo
 const focuses = [];
 function frame(now) {
   requestAnimationFrame(frame);
+  tick(now);
+}
+bgTimer(() => { if (document.hidden) tick(performance.now()); }, 33); // aba oculta não recebe rAF: o jogo e o admin continuam
+function tick(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now; T += dt;
   if (!paused) { acc += dt; let n = 0; while (acc >= STEP && n++ < 5) { stepSim(STEP); acc -= STEP; } if (n >= 5) acc = 0; }
   const alpha = paused ? 1 : acc / STEP, rdt = paused ? 0 : dt;
@@ -480,7 +506,7 @@ let lastStat = '';
 function lobbyStatus() {
   const on = [...players.values()].filter((p) => p.online && p.id !== 'kb').length;
   const pads = [...players.values()].filter((p) => p.pad !== undefined && p.online).length;
-  const s = activeList().length ? '' : pads ? `🎮 ${pads} CONTROLE${pads > 1 ? 'S' : ''} — APERTE START!` : on ? `${on} CONECTADO${on > 1 ? 'S' : ''} — TOQUE EM JOGAR!` : 'SEJA O PRIMEIRO PILOTO!';
+  const s = activeList().length ? '' : pads ? `${pads} CONTROLE${pads > 1 ? 'S' : ''} — APERTE START!` : on ? `${on} CONECTADO${on > 1 ? 'S' : ''} — TOQUE EM JOGAR!` : 'SEJA O PRIMEIRO PILOTO!';
   if (s !== lastStat) { lastStat = s; ui.qstat(s); }
 }
 function adminBeat() {
@@ -491,14 +517,25 @@ function adminBeat() {
 
 // ---------- init ----------
 async function init() {
-  capys.setCount(CFG.capyCount);
+  window.__progress?.(0.7, 'CARREGANDO CAPIVARAS…');
+  await loadCapy();
+  capys.setCount(capTarget(0));
   views = computeViews();
   applyQuality(QUALITY[quality] ? quality : 'HIGH');
   const [px, pz] = world.campus.plaza;
   const u = pool[0]; u.setActive(true); u.setCfg(DEMO_CFGS[0]); u.teleport(px + 40, pz + 40); u.yaw = u.prevYaw = Math.PI; u.rpos.copy(u.pos);
   ai.wander = world.randomSpot(null, 0); sound.sfxScale = 0.45; sound.setIntensity(0.1);
-  try { const info = await (await fetch('/api/info')).json(); ui.lobby({ url: info.url, qr: '/api/qr.svg' }); lb = info.lb || []; ui.rank(lb); } catch { /* sem servidor: segue em demo */ }
+  fetch('/api/info').then((r) => r.json()).then((info) => { ui.lobby({ url: info.url, qr: '/api/qr.svg' }); lb = info.lb || []; ui.rank(lb); }).catch(() => { /* sem servidor: segue em demo */ });
+  // compila os shaders em paralelo (KHR_parallel_shader_compile) no mesmo alvo do 1º frame: sem isso a aba congela
+  // segundos no 1º render (GPU integrada/Windows chega a perder o contexto e o loading nunca some)
+  window.__progress?.(0.92, 'PREPARANDO GRÁFICOS…');
+  try { renderer.setRenderTarget(composer ? composer.readBuffer : null); await renderer.compileAsync(scene, demoCam.camera); } catch (e) { console.warn('[compile]', e); }
+  renderer.setRenderTarget(null);
+  window.__progress?.(1, 'PRONTO!');
+  startAudio(); // no modo quiosque (--autoplay-policy) o som já liga sem clique; fora dele o aviso "clique para ativar" continua
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
 }
+// GPU travou/reiniciou (driver, falta de memória): recarrega já em qualidade baixa em vez de ficar com tela preta
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); const u = new URL(location.href); u.searchParams.set('q', 'LOW'); setTimeout(() => location.replace(u), 1500); });
 window.__game = { ai, pool, act, capys, world, players, command, join, ensureKb, applyQuality, fx, sound, ui, get views() { return views; }, get fps() { return fps; }, THREE, scene, renderer, demoCam };
 init();

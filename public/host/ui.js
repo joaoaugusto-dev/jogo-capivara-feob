@@ -4,11 +4,11 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const restart = (e, cls) => { e.classList.remove(cls); void e.offsetWidth; e.classList.add(cls); };
 
 const TEMPLATE = `
-<div class="pchip panel"><span class="ic">🛸</span><b class="pname">PILOTO</b></div>
+<div class="pchip panel"><b class="pname">PILOTO</b></div>
 <div class="timer panel"><span class="tval">2:00</span></div>
 <div class="scorebox panel"><b class="sval">0</b><small>PTS</small></div>
 <div class="combo hide"><b class="cval"></b><i><u class="cbar"></u></i></div>
-<div class="foot panel">🐹 <b class="ncamp">0</b> NO CAMPUS &nbsp;·&nbsp; ✨ <b class="ngot">0</b></div>
+<div class="foot panel"><b class="ncamp">0</b> NO CAMPUS · <b class="ngot">0</b> ABDUZIDAS</div>
 <div class="center"><div class="banner"></div><div class="count"></div></div>
 <div class="intro panel hide"><small>PILOTO</small><b class="iname"></b><span>PREPARE-SE!</span></div>
 <div class="result hide"><div class="card panel"><small>FIM DE JOGO</small><h2 class="rname"></h2>
@@ -87,10 +87,10 @@ export const ui = {
   },
   mode(demo) { document.body.classList.toggle('playing', !demo); },
   pause(b) { $('pause').classList.toggle('hide', !b); },
-  lobby({ url, qr }) { if (url) { $('joinurl').textContent = url.replace('http://', ''); $('joinurl2').textContent = url.replace('http://', ''); } if (qr) { $('qr').src = qr; $('qr2').src = qr; } },
-  rank(lb) { $('rankl').innerHTML = lb.length ? lb.slice(0, 5).map((e) => `<li><span>${esc(e.n)}</span><b style="font-weight:400">${e.s}</b></li>`).join('') : '<li class="empty">Seja o primeiro!</li>'; },
+  lobby({ url, qr }) { if (url) { $('joinurl').textContent = url.replace(/^https?:\/\//, ''); $('joinurl2').textContent = url.replace(/^https?:\/\//, ''); } if (qr) { $('qr').src = qr; $('qr2').src = qr; } },
+  rank(lb) { $('rankl').innerHTML = lb.length ? lb.slice(0, 3).map((e) => `<li><span>${esc(e.n)}</span><b style="font-weight:400">${e.s}</b></li>`).join('') : '<li class="empty">Seja o primeiro!</li>'; },
   qstat(txt) { const e = $('qstat'); if (e.textContent !== txt) e.textContent = txt; },
   gate(show) { $('gate').classList.toggle('hide', !show); },
-  loaded() { const l = $('loading'); l.classList.add('done'); setTimeout(() => l.remove(), 1000); },
+  loaded() { (window.__ready || Promise.resolve()).then(() => { const l = $('loading'); l.classList.add('done'); setTimeout(() => l.remove(), 1000); }); },
   dbg(txt, show) { const e = $('dbg'); e.classList.toggle('hide', !show); if (show) e.textContent = txt; },
 };
