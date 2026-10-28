@@ -304,9 +304,9 @@ export function buildCampus(scene, { windU, fx }) {
     for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) { const dx = hh(x + 1, y) - hh(x, y), dy = hh(x, y + 1) - hh(x, y), i = (y * 128 + x) * 4; id.data[i] = 128 - dx * 90; id.data[i + 1] = 128 - dy * 90; id.data[i + 2] = 255; id.data[i + 3] = 255; }
     ng.putImageData(id, 0, 0);
     const nt = new THREE.CanvasTexture(nc); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(6, 5);
-    const wm = new THREE.MeshStandardMaterial({ color: 0x2aa0d6, roughness: 0.1, metalness: 0.5, normalMap: nt, normalScale: new THREE.Vector2(0.3, 0.3), envMapIntensity: 1.1, transparent: true, opacity: 0.94 });
+    const wm = new THREE.MeshStandardMaterial({ color: 0x2aa0d6, roughness: 0.2, metalness: 0.3, normalMap: nt, normalScale: new THREE.Vector2(0.3, 0.3), envMapIntensity: 1.1, transparent: true, opacity: 0.94 });
     wm.onBeforeCompile = (sh) => { // anti-repetição da ondulação: soma uma segunda escala/rotação do normal map
-      sh.fragmentShader = sh.fragmentShader.split('texture2D( normalMap, vNormalMapUv )').join('(texture2D( normalMap, vNormalMapUv ) + texture2D( normalMap, mat2(0.8, -0.6, 0.6, 0.8) * vNormalMapUv * 0.37 + 0.21 ) - 0.5)');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', 'outgoingLight = min(outgoingLight, vec3(1.3)); // teto no brilho: reflexo do sol baixo não estoura no bloom\n#include <opaque_fragment>').split('texture2D( normalMap, vNormalMapUv )').join('(texture2D( normalMap, vNormalMapUv ) + texture2D( normalMap, mat2(0.8, -0.6, 0.6, 0.8) * vNormalMapUv * 0.37 + 0.21 ) - 0.5)');
     };
     for (const L of LAKES) {
       const mud = new THREE.Mesh(new THREE.CircleGeometry(1, 56).rotateX(-Math.PI / 2), std(0x8a7656, { roughness: 1 })); mud.scale.set(L.rx + 2.2, 1, L.rz + 2.2); mud.position.set(L.x, 0.04, L.z); mud.receiveShadow = true; scene.add(mud);

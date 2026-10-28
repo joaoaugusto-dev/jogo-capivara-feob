@@ -143,7 +143,7 @@ class Capy {
     }
     if (!ufo) return;
     beamOn = ufo.beamOn;
-    const threat = beamOn ? d < 7 + this.skit * 14 : d < 3 + this.skit * 5;
+    const threat = beamOn ? d < 5 + this.skit * 9 : d < 3 + this.skit * 5;
     if (s !== 'flee' && s !== 'look' && threat && this.skit > 0.2) { this.state = 'look'; this.t = 0; this.react = rnd(0.25, 0.6); cb.onStartle?.(this); return; }
     if (s === 'look') {
       this.faceTo(Math.atan2(ufo.pos.x - this.x, ufo.pos.z - this.z), dt, 8);
@@ -155,7 +155,7 @@ class Capy {
       let a = Math.atan2(this.x - ufo.pos.x, this.z - ufo.pos.z) + this.fleeA + Math.sin(this.t * 3 + this.seed) * 0.25;
       // evita obstáculos: tenta girar
       for (let k = 0; k < 6 && this.world.isBlocked(this.x + Math.sin(a) * 2.2, this.z + Math.cos(a) * 2.2, 0.8); k++) a += (k % 2 ? 1 : -1) * 0.55 * (k + 1);
-      this.faceTo(a, dt, 10); this.moveForward(dt, 6.6 * (0.9 + this.skit * 0.15));
+      this.faceTo(a, dt, 10); this.moveForward(dt, 5.2 * (0.9 + this.skit * 0.15));
       if (d > 28 || this.fleeT > 5) { this.state = 'idle'; this.t = 0; }
       return;
     }
@@ -190,11 +190,11 @@ class Capy {
   stepAbducted(dt, cb) {
     const ufo = this.owner; this.grabT += dt; this.moveSpeed = 0;
     const ux = ufo.pos.x, uz = ufo.pos.z;
-    const out = Math.hypot(this.x - ux, this.z - uz) > ufo.radiusAt(this.y) + 1.6;
+    const out = Math.hypot(this.x - ux, this.z - uz) > ufo.radiusAt(this.y) + 2.6;
     if (!ufo.beamOn || !ufo.active || out) { this.state = 'fall'; this.vy = 2; this.t = 0; cb.onDrop?.(this); return; }
-    const vy = this.grabT < 0.45 ? 1.7 : 1.7 + (this.grabT - 0.45) * 12;
+    const vy = this.grabT < 0.2 ? 4 : 4 + (this.grabT - 0.2) * 24; // sobe ~2x mais rápido: captura em ~1 s
     this.y += vy * dt;
-    const k = Math.min(1, 2.6 * dt);
+    const k = Math.min(1, 4 * dt);
     this.x += (ux - this.x) * k; this.z += (uz - this.z) * k;
     this.yaw += dt * (2 + this.grabT * 5);
     if (this.y >= ufo.pos.y - 1.5) {

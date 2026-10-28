@@ -12,12 +12,12 @@ export const CFG = {
   goldenMult: 3,
   // OVNI
   ufoAlt: 15,
-  ufoSpeed: 40,
-  beamSlow: 0.62,
-  turboMult: 1.75,
+  ufoSpeed: 30,
+  beamSlow: 0.8,
+  turboMult: 1.5,
   turboTime: 1.1,
   turboCooldown: 4.5,
-  beamRadius: 4.6,     // raio no chão
+  beamRadius: 6,       // raio no chão
   halfX: 385,          // limite do mapa (m) — campus FEOB
   halfZ: 222,
   maxPlayers: 4,

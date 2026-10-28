@@ -103,7 +103,7 @@ export class Ufo {
     const mag = Math.min(1, Math.hypot(wx, wz));
     const max = CFG.ufoSpeed * (beam ? CFG.beamSlow : 1) * (this.turboT > 0 ? CFG.turboMult : 1);
     const dx = mag > 0.001 ? (wx / mag) * mag * max : 0, dz = mag > 0.001 ? (wz / mag) * mag * max : 0;
-    const k = 1 - Math.exp(-(mag > 0.05 ? (this.turboT > 0 ? 4 : 2.3) : 1.35) * dt);
+    const k = 1 - Math.exp(-(mag > 0.05 ? (this.turboT > 0 ? 3 : 2) : 1.35) * dt);
     const ox = this.vel.x, oz = this.vel.z;
     this.vel.x += (dx - this.vel.x) * k; this.vel.z += (dz - this.vel.z) * k;
     this.accel.set((this.vel.x - ox) / dt, 0, (this.vel.z - oz) / dt);
@@ -112,7 +112,7 @@ export class Ufo {
     if (Math.abs(this.pos.z) > CFG.halfZ) { this.pos.z = Math.sign(this.pos.z) * CFG.halfZ; this.vel.z *= -0.15; }
     this.collide?.(this.pos, this.vel);
     const sp = Math.hypot(this.vel.x, this.vel.z);
-    if (sp > 1.2) this.yaw += wrapAngle(Math.atan2(this.vel.x, this.vel.z) - this.yaw) * (1 - Math.exp(-3.2 * dt));
+    if (sp > 1.2) this.yaw += wrapAngle(Math.atan2(this.vel.x, this.vel.z) - this.yaw) * (1 - Math.exp(-2.4 * dt));
   }
   get speed() { return Math.hypot(this.vel.x, this.vel.z); }
   get turbo() { return this.turboT > 0; }

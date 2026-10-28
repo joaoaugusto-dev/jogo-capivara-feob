@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { Pass } from 'three/addons/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { CFG, QUALITY, DEFAULT_PLAYER_CFG } from './config.js';
 import { FX } from './fx.js';
 import { World } from './world.js';
@@ -30,6 +31,18 @@ try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 }
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x140b28, 1); // célula vazia da tela dividida fica opaca (evita NaN/branco no bloom)
+// grade final (já em sRGB, depois do tonemap): sombras puxadas pro violeta e luzes pro âmbar do pôr do sol, vinheta leve e dither contra faixas no céu
+const GRADE = { uniforms: { tDiffuse: { value: null } }, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: `varying vec2 vUv; uniform sampler2D tDiffuse;
+  void main(){
+    vec3 c=texture2D(tDiffuse,vUv).rgb; float l=dot(c,vec3(.2126,.7152,.0722));
+    c=mix(vec3(l),c,1.04);
+    c=mix(c,c*vec3(.93,.9,1.08),(1.-smoothstep(.0,.4,l))*.3);
+    c=mix(c,c*vec3(1.06,1.0,.92),smoothstep(.45,1.,l)*.5);
+    vec2 d=vUv-.5; c*=1.-dot(d,d)*.32; c=pow(c,vec3(.95));
+    c+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5)/255.;
+    gl_FragColor=vec4(c,1.);
+  }` };
 const scene = new THREE.Scene();
 const fx = new FX(scene);
 const world = new World(renderer, scene, fx);
@@ -53,9 +66,9 @@ function updateCamera(cam, u, st, dt, t) {
   let dist = 17, height = 7.6, ahead = 6.5, down = -3.4, fov = 58, rate = 5.5, yawTarget = cam.yaw, orbit = false;
   if (st === 'play' || st === 'count') {
     const fwd = st === 'play' ? Math.max(0, -cam.inputY) : 0;
-    cam.yaw += wrap(u.yaw - cam.yaw) * (1 - Math.exp(-1.25 * dt * fwd));
+    cam.yaw += wrap(u.yaw - cam.yaw) * (1 - Math.exp(-0.9 * dt * fwd));
     dist -= u.beamK * 2.2; height -= u.beamK * 0.8; down -= u.beamK * 4.2; ahead += u.beamK * 1.5;
-    fov = 58 + Math.min(u.speed, 40) * 0.2 + (u.turbo ? 8 : 0) - u.beamK * 5; if (u.turbo) dist += 2.5;
+    fov = 58 + Math.min(u.speed, 40) * 0.08 + (u.turbo ? 4 : 0) - u.beamK * 3; if (u.turbo) dist += 2.5; // pouca variação de FOV: zoom rápido enjoa
   } else if (st === 'intro') {
     cam.orbit += dt * 0.75; const a = cam.orbit + 2.4;
     _d.set(p.x + Math.sin(a) * 15.5, p.y + 3.6 + Math.sin(t * 0.8) * 0.4, p.z + Math.cos(a) * 15.5); _l.set(p.x, p.y + 0.2, p.z);
@@ -80,9 +93,9 @@ function finishCam(cam, u, want, look, fov, rate, dt) {
   if (cam.snap) { cam.pos.copy(want); cam.look.copy(look); cam.fov = fov; cam.snap = false; }
   cam.pos.lerp(want, 1 - Math.exp(-rate * dt)); cam.look.lerp(look, 1 - Math.exp(-6.5 * dt)); cam.fov += (fov - cam.fov) * (1 - Math.exp(-3 * dt));
   cam.shake = Math.max(0, cam.shake - dt * 2.4);
-  const sh = cam.shake * cam.shake * 0.9, c = cam.camera;
+  const sh = cam.shake * cam.shake * 0.45, c = cam.camera;
   c.position.set(cam.pos.x + (Math.random() - 0.5) * sh, cam.pos.y + (Math.random() - 0.5) * sh, cam.pos.z + (Math.random() - 0.5) * sh);
-  c.lookAt(cam.look); c.rotateZ(u.tiltZ * 0.3 + (Math.random() - 0.5) * sh * 0.02);
+  c.lookAt(cam.look); c.rotateZ(u.tiltZ * 0.1 + (Math.random() - 0.5) * sh * 0.02);
   if (Math.abs(c.fov - cam.fov) > 0.02) { c.fov = cam.fov; c.updateProjectionMatrix(); }
 }
 
@@ -150,7 +163,7 @@ function buildComposer(msaa) {
   composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: msaa }));
   composer.addPass(new MultiViewPass());
   bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.24, 0.5, 1.05);
-  composer.addPass(bloom); composer.addPass(new OutputPass());
+  composer.addPass(bloom); composer.addPass(new OutputPass()); composer.addPass(new ShaderPass(GRADE));
   composerMsaa = msaa;
 }
 function resize() {
