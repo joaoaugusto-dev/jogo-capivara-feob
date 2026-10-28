@@ -26,7 +26,7 @@ npm start          # sobe o servidor na porta 3000 (PORT=8080 npm start para tro
 npm run kiosk      # (opcional) abre o Chrome em tela cheia, com som liberado
 ```
 - **Tela do jogo** (abrir no PC ligado à TV): `http://localhost:3000/`
-- **Controle** (o QR Code do lobby aponta para ele): `http://IP-DO-PC:3000/join`
+- **Controle** (o QR Code do lobby aponta para ele): `http://IP-DO-PC:3000/join` — hospedado: `https://capivarias-abduzidas.joaoaugusto.dev/join` (definido por `JOIN_URL` no Dockerfile)
 - **Admin** (só neste PC): `http://localhost:3000/admin` — iniciar, pausar, resetar, encerrar, tempo, nº de capivaras, qualidade, fila, ranking
   (para liberar de outro aparelho: `ADMIN_PIN=1234 npm start` e abrir `/admin?pin=1234`)
 - Se o IP detectado estiver errado (várias placas de rede): `HOST_IP=192.168.0.10 npm start`
